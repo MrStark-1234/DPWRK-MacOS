@@ -21,6 +21,18 @@ struct BlocklistItem: Identifiable, Codable {
     }
 }
 
+enum BlocklistMode: String, Codable, CaseIterable {
+    case blacklist = "blacklist"
+    case whitelist = "whitelist"
+    
+    var displayName: String {
+        switch self {
+        case .blacklist: return "Blacklist"
+        case .whitelist: return "Whitelist"
+        }
+    }
+}
+
 struct MacOSApplication: Identifiable {
     let id = UUID()
     let name: String

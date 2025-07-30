@@ -10,38 +10,27 @@ import SwiftUI
 struct BlocklistEditView: View {
     @StateObject private var blocklistViewModel = BlocklistViewModel()
     @Binding var isPresented: Bool
-    @State private var showingAddWebsite = false
-    @State private var selectedTab = 0
+    @State private var selectedMode: BlocklistMode = .blacklist
+    @State private var showingAddToBlocked = false
+    @State private var showingAddToAllowed = false
     
     var body: some View {
         VStack(spacing: 0) {
             // Header
             header
             
-            // Tab Selection
-            tabSelector
+            // Mode Toggle
+            modeToggle
             
-            // Content
-            Group {
-                if selectedTab == 0 {
-                    applicationsSection
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
-                } else {
-                    websitesSection
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
-                }
-            }
-            .animation(.easeInOut(duration: 0.3), value: selectedTab)
+            // Dual-List Panels
+            dualListPanels
+            
+            // Action Buttons
+            actionButtons
         }
         .background(DPWRKStyle.Colors.background)
-        .sheet(isPresented: $showingAddWebsite) {
-            AddWebsiteView(blocklistViewModel: blocklistViewModel)
+        .onAppear {
+            selectedMode = blocklistViewModel.currentMode
         }
     }
     
@@ -49,7 +38,7 @@ struct BlocklistEditView: View {
     
     private var header: some View {
         HStack {
-            Text("Edit Blocklist")
+            Text("Website Blocking")
                 .font(DPWRKStyle.Typography.heading1())
                 .fontWeight(.semibold)
             
@@ -75,202 +64,142 @@ struct BlocklistEditView: View {
         )
     }
     
-    // MARK: - Tab Selector
+    // MARK: - Mode Toggle
     
-    private var tabSelector: some View {
-        HStack(spacing: 0) {
-            tabButton(title: "Applications", index: 0)
-            tabButton(title: "Websites", index: 1)
+    private var modeToggle: some View {
+        HStack {
+            ForEach(BlocklistMode.allCases, id: \.self) { mode in
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedMode = mode
+                    }
+                }) {
+                    Text(mode.displayName)
+                        .font(DPWRKStyle.Typography.sessionBody())
+                        .fontWeight(.medium)
+                        .foregroundColor(selectedMode == mode ? .white : Color(hex: "4F46E5"))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(selectedMode == mode ? Color(hex: "4F46E5") : Color(hex: "F9FAFB"))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal, DPWRKStyle.Layout.spacingLarge)
-        .padding(.top, DPWRKStyle.Layout.spacingMedium)
+        .padding(.vertical, DPWRKStyle.Layout.spacingMedium)
     }
     
-    private func tabButton(title: String, index: Int) -> some View {
-        Button(action: {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                selectedTab = index
-            }
-        }) {
-            VStack(spacing: 8) {
-                Text(title)
-                    .font(DPWRKStyle.Typography.sessionBody())
-                    .fontWeight(selectedTab == index ? .semibold : .regular)
-                    .foregroundColor(selectedTab == index ? DPWRKStyle.Colors.accent : DPWRKStyle.Colors.secondaryText)
-                
-                Rectangle()
-                    .frame(height: 2)
-                    .foregroundColor(selectedTab == index ? DPWRKStyle.Colors.accent : Color.clear)
-            }
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-    }
+    // MARK: - Dual-List Panels
     
-    // MARK: - Applications Section
-    
-    private var applicationsSection: some View {
-        VStack(spacing: 0) {
-            // Search bar
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(DPWRKStyle.Colors.secondaryText)
-                
-                TextField("Search applications...", text: $blocklistViewModel.searchText)
-                    .font(DPWRKStyle.Typography.sessionBody())
-            }
-            .padding()
-            .background(DPWRKStyle.Colors.background)
-            .overlay(
-                RoundedRectangle(cornerRadius: DPWRKStyle.Layout.cornerRadius)
-                    .stroke(DPWRKStyle.Colors.border, lineWidth: 1)
-            )
-            .padding(.horizontal, DPWRKStyle.Layout.spacingLarge)
-            .padding(.vertical, DPWRKStyle.Layout.spacingMedium)
-            
-            // Applications list
-            if blocklistViewModel.isLoading {
-                VStack {
-                    ProgressView()
-                        .scaleEffect(1.2)
-                    Text("Scanning applications...")
-                        .font(DPWRKStyle.Typography.sessionBody())
-                        .foregroundColor(DPWRKStyle.Colors.secondaryText)
-                        .padding(.top, DPWRKStyle.Layout.spacingSmall)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(blocklistViewModel.filteredApplications) { app in
-                            applicationRow(app)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    private func applicationRow(_ app: MacOSApplication) -> some View {
+    private var dualListPanels: some View {
         HStack(spacing: DPWRKStyle.Layout.spacingMedium) {
-            // App icon
-            if let iconPath = app.iconPath,
-               let image = NSImage(contentsOfFile: iconPath) {
-                Image(nsImage: image)
-                    .resizable()
-                    .frame(width: 16, height: 16)
-            } else {
-                Image(systemName: "app.fill")
-                    .frame(width: 16, height: 16)
-                    .foregroundColor(DPWRKStyle.Colors.secondaryText)
+            // Blocked Sites Panel
+            websitePanel(
+                title: "Blocked Sites",
+                websites: blocklistViewModel.filteredBlockedWebsites,
+                isActive: selectedMode == .blacklist,
+                onAdd: { showingAddToBlocked = true },
+                onRemove: { item in blocklistViewModel.removeItem(item, from: .blacklist) },
+                onToggle: { item in blocklistViewModel.toggleItem(item, in: .blacklist) }
+            )
+            .sheet(isPresented: $showingAddToBlocked) {
+                AddWebsiteToListView(
+                    listType: .blacklist,
+                    onAdd: { url in blocklistViewModel.addWebsite(url, to: .blacklist) }
+                )
             }
             
-            // App name
-            Text(app.name)
-                .font(DPWRKStyle.Typography.sessionBody())
+            // Allowed Sites Panel
+            websitePanel(
+                title: "Allowed Sites",
+                websites: blocklistViewModel.filteredAllowedWebsites,
+                isActive: selectedMode == .whitelist,
+                onAdd: { showingAddToAllowed = true },
+                onRemove: { item in blocklistViewModel.removeItem(item, from: .whitelist) },
+                onToggle: { item in blocklistViewModel.toggleItem(item, in: .whitelist) }
+            )
+            .sheet(isPresented: $showingAddToAllowed) {
+                AddWebsiteToListView(
+                    listType: .whitelist,
+                    onAdd: { url in blocklistViewModel.addWebsite(url, to: .whitelist) }
+                )
+            }
+        }
+        .padding(.horizontal, DPWRKStyle.Layout.spacingLarge)
+        .padding(.vertical, DPWRKStyle.Layout.spacingMedium)
+    }
+    
+    // MARK: - Website Panel
+    
+    private func websitePanel(
+        title: String,
+        websites: [BlocklistItem],
+        isActive: Bool,
+        onAdd: @escaping () -> Void,
+        onRemove: @escaping (BlocklistItem) -> Void,
+        onToggle: @escaping (BlocklistItem) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: DPWRKStyle.Layout.spacingMedium) {
+            // Panel Title
+            Text(title)
+                .font(DPWRKStyle.Typography.sessionBodyLarge())
+                .fontWeight(.semibold)
                 .foregroundColor(DPWRKStyle.Colors.primaryText)
             
-            Spacer()
-            
-            // Checkbox
-            Button(action: {
-                if blocklistViewModel.isApplicationBlocked(app) {
-                    if let item = blocklistViewModel.blockedApplications.first(where: { $0.bundleIdentifier == app.bundleIdentifier }) {
-                        blocklistViewModel.removeItem(item)
+            // Website List
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(websites) { website in
+                        websiteRow(
+                            website: website,
+                            isActive: isActive,
+                            onRemove: { onRemove(website) },
+                            onToggle: { onToggle(website) }
+                        )
                     }
-                } else {
-                    blocklistViewModel.addApplication(app)
+                    
+                    if websites.isEmpty {
+                        emptyStateView(for: title)
+                    }
                 }
-            }) {
-                Image(systemName: blocklistViewModel.isApplicationBlocked(app) ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 18))
-                    .foregroundColor(blocklistViewModel.isApplicationBlocked(app) ? DPWRKStyle.Colors.accent : DPWRKStyle.Colors.secondaryText)
+            }
+            .frame(minHeight: 200)
+            
+            // Add Website Button
+            Button(action: onAdd) {
+                HStack {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14))
+                    Text("Add Website")
+                        .font(DPWRKStyle.Typography.sessionBody())
+                }
+                .foregroundColor(isActive ? Color(hex: "4F46E5") : DPWRKStyle.Colors.secondaryText)
             }
             .buttonStyle(.plain)
+            .disabled(!isActive)
         }
-        .padding(.horizontal, DPWRKStyle.Layout.spacingLarge)
-        .padding(.vertical, DPWRKStyle.Layout.spacingSmall)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if blocklistViewModel.isApplicationBlocked(app) {
-                if let item = blocklistViewModel.blockedApplications.first(where: { $0.bundleIdentifier == app.bundleIdentifier }) {
-                    blocklistViewModel.removeItem(item)
-                }
-            } else {
-                blocklistViewModel.addApplication(app)
-            }
-        }
+        .padding(DPWRKStyle.Layout.spacingMedium)
+        .background(Color(hex: "F9FAFB"))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(hex: "E5E7EB"), lineWidth: 1)
+        )
+        .cornerRadius(12)
+        .opacity(isActive ? 1.0 : 0.5)
+        .disabled(!isActive)
     }
     
-    // MARK: - Websites Section
+    // MARK: - Website Row
     
-    private var websitesSection: some View {
-        VStack(spacing: 0) {
-            // Add website button
-            HStack {
-                Button(action: {
-                    showingAddWebsite = true
-                }) {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Add Website")
-                    }
-                }
-                .buttonStyle(DPWRKStyle.PrimaryButtonStyle())
-                
-                Spacer()
-            }
-            .padding(.horizontal, DPWRKStyle.Layout.spacingLarge)
-            .padding(.vertical, DPWRKStyle.Layout.spacingMedium)
-            
-            // Search bar
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(DPWRKStyle.Colors.secondaryText)
-                
-                TextField("Search websites...", text: $blocklistViewModel.websiteSearchText)
-                    .font(DPWRKStyle.Typography.sessionBody())
-            }
-            .padding()
-            .background(DPWRKStyle.Colors.background)
-            .overlay(
-                RoundedRectangle(cornerRadius: DPWRKStyle.Layout.cornerRadius)
-                    .stroke(DPWRKStyle.Colors.border, lineWidth: 1)
-            )
-            .padding(.horizontal, DPWRKStyle.Layout.spacingLarge)
-            .padding(.bottom, DPWRKStyle.Layout.spacingMedium)
-            
-            // Websites list
-            if blocklistViewModel.filteredWebsites.isEmpty {
-                VStack {
-                    Image(systemName: "globe.badge.chevron.backward")
-                        .font(.system(size: 48))
-                        .foregroundColor(DPWRKStyle.Colors.secondaryText)
-                    
-                    Text("No websites blocked")
-                        .font(DPWRKStyle.Typography.sessionBodyLarge())
-                        .foregroundColor(DPWRKStyle.Colors.secondaryText)
-                        .padding(.top, DPWRKStyle.Layout.spacingSmall)
-                    
-                    Text("Add websites to block during focus sessions")
-                        .font(DPWRKStyle.Typography.sessionBody())
-                        .foregroundColor(DPWRKStyle.Colors.secondaryText)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(blocklistViewModel.filteredWebsites) { website in
-                            websiteRow(website)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    private func websiteRow(_ website: BlocklistItem) -> some View {
+    private func websiteRow(
+        website: BlocklistItem,
+        isActive: Bool,
+        onRemove: @escaping () -> Void,
+        onToggle: @escaping () -> Void
+    ) -> some View {
         HStack(spacing: DPWRKStyle.Layout.spacingMedium) {
             // Website icon
             Image(systemName: "globe")
@@ -287,29 +216,68 @@ struct BlocklistEditView: View {
             // Toggle switch
             Toggle("", isOn: Binding(
                 get: { website.isEnabled },
-                set: { _ in blocklistViewModel.toggleItem(website) }
+                set: { _ in onToggle() }
             ))
             .toggleStyle(SwitchToggleStyle())
             .scaleEffect(0.8)
+            .disabled(!isActive)
             
             // Delete button
-            Button(action: {
-                blocklistViewModel.removeItem(website)
-            }) {
+            Button(action: onRemove) {
                 Image(systemName: "trash")
                     .font(.system(size: 16))
-                    .foregroundColor(DPWRKStyle.Colors.warning)
+                    .foregroundColor(isActive ? DPWRKStyle.Colors.warning : DPWRKStyle.Colors.secondaryText)
             }
             .buttonStyle(.plain)
+            .disabled(!isActive)
+        }
+        .padding(.horizontal, DPWRKStyle.Layout.spacingSmall)
+        .padding(.vertical, DPWRKStyle.Layout.spacingSmall)
+        .frame(height: 48)
+        .contentShape(Rectangle())
+    }
+    
+    // MARK: - Empty State
+    
+    private func emptyStateView(for title: String) -> some View {
+        VStack(spacing: DPWRKStyle.Layout.spacingSmall) {
+            Image(systemName: title.contains("Blocked") ? "shield.slash" : "shield.checkered")
+                .font(.system(size: 32))
+                .foregroundColor(DPWRKStyle.Colors.secondaryText)
+            
+            Text("No websites \(title.contains("Blocked") ? "blocked" : "allowed")")
+                .font(DPWRKStyle.Typography.sessionBody())
+                .foregroundColor(DPWRKStyle.Colors.secondaryText)
+        }
+        .padding(.vertical, DPWRKStyle.Layout.spacingLarge)
+    }
+    
+    // MARK: - Action Buttons
+    
+    private var actionButtons: some View {
+        HStack(spacing: DPWRKStyle.Layout.spacingMedium) {
+            Button("Cancel") {
+                isPresented = false
+            }
+            .buttonStyle(DPWRKStyle.SecondaryButtonStyle())
+            .frame(minWidth: 100)
+            
+            Button("Save") {
+                blocklistViewModel.currentMode = selectedMode
+                blocklistViewModel.saveMode()
+                isPresented = false
+            }
+            .buttonStyle(DPWRKStyle.PrimaryButtonStyle())
+            .frame(minWidth: 100)
         }
         .padding(.horizontal, DPWRKStyle.Layout.spacingLarge)
-        .padding(.vertical, DPWRKStyle.Layout.spacingSmall)
+        .padding(.vertical, DPWRKStyle.Layout.spacingMedium)
     }
 }
 
 #Preview {
-    @State var isPresented = true
+    @Previewable @State var isPresented = true
     
     return BlocklistEditView(isPresented: $isPresented)
-        .frame(width: 600, height: 500)
+        .frame(width: 700, height: 600)
 }

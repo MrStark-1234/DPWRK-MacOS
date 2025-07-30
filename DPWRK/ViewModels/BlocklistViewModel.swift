@@ -11,16 +11,22 @@ import AppKit
 @MainActor
 class BlocklistViewModel: ObservableObject {
     @Published var blocklistItems: [BlocklistItem] = []
+    @Published var allowlistItems: [BlocklistItem] = []
     @Published var availableApplications: [MacOSApplication] = []
     @Published var isLoading = false
     @Published var searchText = ""
     @Published var websiteSearchText = ""
+    @Published var currentMode: BlocklistMode = .blacklist
     
     private let userDefaults = UserDefaults.standard
     private let blocklistKey = "dpwrk_blocklist"
+    private let allowlistKey = "dpwrk_allowlist"
+    private let modeKey = "dpwrk_blocklist_mode"
     
     init() {
         loadBlocklist()
+        loadAllowlist()
+        loadMode()
         scanApplications()
     }
     
@@ -39,12 +45,38 @@ class BlocklistViewModel: ObservableObject {
         }
     }
     
-    func addWebsite(_ url: String) {
+    func loadAllowlist() {
+        if let data = userDefaults.data(forKey: allowlistKey),
+           let items = try? JSONDecoder().decode([BlocklistItem].self, from: data) {
+            allowlistItems = items
+        }
+    }
+    
+    func saveAllowlist() {
+        if let data = try? JSONEncoder().encode(allowlistItems) {
+            userDefaults.set(data, forKey: allowlistKey)
+        }
+    }
+    
+    func loadMode() {
+        if let modeString = userDefaults.string(forKey: modeKey),
+           let mode = BlocklistMode(rawValue: modeString) {
+            currentMode = mode
+        }
+    }
+    
+    func saveMode() {
+        userDefaults.set(currentMode.rawValue, forKey: modeKey)
+    }
+    
+    func addWebsite(_ url: String, to list: BlocklistMode) {
         let cleanedURL = cleanWebsiteURL(url)
         guard !cleanedURL.isEmpty else { return }
         
-        // Check if website already exists
-        if !blocklistItems.contains(where: { $0.name == cleanedURL && $0.type == .website }) {
+        let targetList = list == .blacklist ? blocklistItems : allowlistItems
+        
+        // Check if website already exists in the target list
+        if !targetList.contains(where: { $0.name == cleanedURL && $0.type == .website }) {
             let item = BlocklistItem(
                 name: cleanedURL,
                 type: .website,
@@ -52,14 +84,51 @@ class BlocklistViewModel: ObservableObject {
                 bundleIdentifier: nil,
                 iconPath: nil
             )
-            blocklistItems.append(item)
+            
+            if list == .blacklist {
+                blocklistItems.append(item)
+                saveBlocklist()
+            } else {
+                allowlistItems.append(item)
+                saveAllowlist()
+            }
+        }
+    }
+    
+    func addWebsite(_ url: String) {
+        addWebsite(url, to: currentMode)
+    }
+    
+    func removeItem(_ item: BlocklistItem, from list: BlocklistMode) {
+        if list == .blacklist {
+            blocklistItems.removeAll { $0.id == item.id }
             saveBlocklist()
+        } else {
+            allowlistItems.removeAll { $0.id == item.id }
+            saveAllowlist()
         }
     }
     
     func removeItem(_ item: BlocklistItem) {
+        // Try to remove from both lists
         blocklistItems.removeAll { $0.id == item.id }
+        allowlistItems.removeAll { $0.id == item.id }
         saveBlocklist()
+        saveAllowlist()
+    }
+    
+    func toggleItem(_ item: BlocklistItem, in list: BlocklistMode) {
+        if list == .blacklist {
+            if let index = blocklistItems.firstIndex(where: { $0.id == item.id }) {
+                blocklistItems[index].isEnabled.toggle()
+                saveBlocklist()
+            }
+        } else {
+            if let index = allowlistItems.firstIndex(where: { $0.id == item.id }) {
+                allowlistItems[index].isEnabled.toggle()
+                saveAllowlist()
+            }
+        }
     }
     
     func toggleItem(_ item: BlocklistItem) {
@@ -180,6 +249,14 @@ class BlocklistViewModel: ObservableObject {
         return websites.filter { item in
             item.name.localizedCaseInsensitiveContains(websiteSearchText)
         }
+    }
+    
+    var filteredBlockedWebsites: [BlocklistItem] {
+        return blocklistItems.filter { $0.type == .website }
+    }
+    
+    var filteredAllowedWebsites: [BlocklistItem] {
+        return allowlistItems.filter { $0.type == .website }
     }
     
     var blockedApplications: [BlocklistItem] {
