@@ -27,6 +27,10 @@ struct DPWRKStyle {
         
         /// Font families used in the app
         struct FontFamily {
+            static let bodoni = "Bodoni 72"
+            static let bodoniItalic = "Bodoni 72-Italic"
+            static let bodoniBold = "Bodoni 72-Bold"
+            static let bodoniBoldItalic = "Bodoni 72-BoldItalic"
             static let didot = "Didot"
             static let didotItalic = "Didot-Italic"
             static let didotBold = "Didot-Bold"
@@ -37,11 +41,15 @@ struct DPWRKStyle {
         
         /// Reusable text styles for consistent typography
         static func heading1() -> Font {
-            Font.custom(FontFamily.didot, size: FontSize.largeTitle)
+            Font.custom(FontFamily.bodoni, size: FontSize.largeTitle)
         }
         
         static func heading2() -> Font {
-            Font.custom(FontFamily.didot, size: FontSize.title)
+            Font.custom(FontFamily.bodoni, size: FontSize.title)
+        }
+        
+        static func heading3() -> Font {
+            Font.custom(FontFamily.bodoni, size: FontSize.bodyLarge)
         }
         
         static func body() -> Font {
@@ -58,6 +66,23 @@ struct DPWRKStyle {
         
         static func emphasis() -> Font {
             Font.custom(FontFamily.didotItalic, size: FontSize.body)
+        }
+        
+        // Bodoni variants for session setup and specific content
+        static func sessionBody() -> Font {
+            Font.custom(FontFamily.bodoni, size: FontSize.body)
+        }
+        
+        static func sessionBodyLarge() -> Font {
+            Font.custom(FontFamily.bodoni, size: FontSize.bodyLarge)
+        }
+        
+        static func sessionCaption() -> Font {
+            Font.custom(FontFamily.bodoni, size: FontSize.small)
+        }
+        
+        static func sessionEmphasis() -> Font {
+            Font.custom(FontFamily.bodoniItalic, size: FontSize.body)
         }
         
         static func timerDisplay() -> Font {

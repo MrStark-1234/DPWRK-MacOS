@@ -12,6 +12,7 @@ struct GoalView: View {
     @State private var goalText: String = ""
     @State private var isEditing: Bool = false
     @State private var placeholder: String = "Write your focus goal here..."
+    @State private var showingBlocklistEdit = false
     
     // Debouncer for auto-saving
     @State private var saveTask: Task<Void, Never>?
@@ -62,11 +63,20 @@ struct GoalView: View {
             
             Spacer()
             
-            Button("Start Session") {
-                // This will be implemented in a future task
+            // Button row
+            HStack(spacing: 8) {
+                Button("Start Session") {
+                    // This will be implemented in a future task
+                }
+                .buttonStyle(DPWRKStyle.PrimaryButtonStyle())
+                .frame(maxWidth: .infinity)
+                
+                Button("Edit Blocklist") {
+                    showingBlocklistEdit = true
+                }
+                .buttonStyle(BlocklistButtonStyle())
+                .frame(height: 48)
             }
-            .buttonStyle(DPWRKStyle.PrimaryButtonStyle())
-            .frame(maxWidth: .infinity)
         }
         .padding(DPWRKStyle.Layout.padding)
         .navigationTitle("🎯 Focus")
@@ -76,6 +86,10 @@ struct GoalView: View {
             goalText = sessionViewModel.loadLastGoal()
             // Set a random encouraging placeholder
             placeholder = sessionViewModel.getRandomPlaceholder()
+        }
+        .sheet(isPresented: $showingBlocklistEdit) {
+            BlocklistEditView(isPresented: $showingBlocklistEdit)
+                .frame(minWidth: 600, minHeight: 500)
         }
     }
 }

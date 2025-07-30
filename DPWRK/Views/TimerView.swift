@@ -16,6 +16,7 @@ struct TimerView: View {
     @State private var isSetupMode: Bool = true
     @State private var showDurationSelection: Bool = false
     @State private var showSessionNotes: Bool = false
+    @State private var showingBlocklistEdit = false
     
     // Animation properties (kept for completion animation)
     @State private var timerScale: CGFloat = 1.0
@@ -41,18 +42,26 @@ struct TimerView: View {
                     // Simple timer display
                     timerDisplayView(time: selectedDuration, progress: 1.0)
                     
-                    // Start session button
-                    Button(action: {
-                        // Show duration selection popup
-                        showDurationSelection = true
-                    }) {
-                        HStack {
-                            Image(systemName: "play.fill")
-                            Text("Start Session")
+                    // Button row
+                    HStack(spacing: 8) {
+                        Button(action: {
+                            // Show duration selection popup
+                            showDurationSelection = true
+                        }) {
+                            HStack {
+                                Image(systemName: "play.fill")
+                                Text("Start Session")
+                            }
+                            .frame(minWidth: 140)
                         }
-                        .frame(minWidth: 140)
+                        .buttonStyle(DPWRKStyle.PrimaryButtonStyle())
+                        
+                        Button("Edit Blocklist") {
+                            showingBlocklistEdit = true
+                        }
+                        .buttonStyle(BlocklistButtonStyle())
+                        .frame(height: 48)
                     }
-                    .buttonStyle(DPWRKStyle.PrimaryButtonStyle())
                     .padding(.top, DPWRKStyle.Layout.spacingLarge)
                     
                 } else {
@@ -144,6 +153,10 @@ struct TimerView: View {
             })
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingBlocklistEdit) {
+            BlocklistEditView(isPresented: $showingBlocklistEdit)
+                .frame(minWidth: 600, minHeight: 500)
         }
 
     }
@@ -306,6 +319,26 @@ struct TimerView: View {
         let seconds = Int(timeInterval) % 60
         
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+}
+
+// Custom button style for Edit Blocklist button
+struct BlocklistButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .font(DPWRKStyle.Typography.sessionBody())
+            .foregroundColor(Color(hex: "4F46E5"))
+            .background(DPWRKStyle.Colors.background)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(hex: "4F46E5"), lineWidth: 1)
+            )
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
