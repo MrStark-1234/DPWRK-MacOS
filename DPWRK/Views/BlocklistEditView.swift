@@ -38,9 +38,9 @@ struct BlocklistEditView: View {
     
     private var header: some View {
         HStack {
-            Text("Website Blocking")
+            Text("Blocklist")
                 .font(DPWRKStyle.Typography.heading1())
-                .fontWeight(.semibold)
+                .fontWeight(.light)
             
             Spacer()
             
@@ -75,7 +75,7 @@ struct BlocklistEditView: View {
                     }
                 }) {
                     Text(mode.displayName)
-                        .font(DPWRKStyle.Typography.sessionBody())
+                        .font(DPWRKStyle.Typography.button())
                         .fontWeight(.medium)
                         .foregroundColor(selectedMode == mode ? .white : Color(hex: "4F46E5"))
                         .padding(.horizontal, 16)
@@ -145,7 +145,7 @@ struct BlocklistEditView: View {
         VStack(alignment: .leading, spacing: DPWRKStyle.Layout.spacingMedium) {
             // Panel Title
             Text(title)
-                .font(DPWRKStyle.Typography.sessionBodyLarge())
+                .font(DPWRKStyle.Typography.button())
                 .fontWeight(.semibold)
                 .foregroundColor(DPWRKStyle.Colors.primaryText)
             
@@ -174,7 +174,7 @@ struct BlocklistEditView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 14))
                     Text("Add Website")
-                        .font(DPWRKStyle.Typography.sessionBody())
+                        .font(DPWRKStyle.Typography.button())
                 }
                 .foregroundColor(isActive ? Color(hex: "4F46E5") : DPWRKStyle.Colors.secondaryText)
             }
@@ -208,7 +208,7 @@ struct BlocklistEditView: View {
             
             // Website URL
             Text(website.name)
-                .font(DPWRKStyle.Typography.sessionBody())
+                .font(DPWRKStyle.Typography.button())
                 .foregroundColor(DPWRKStyle.Colors.primaryText)
             
             Spacer()
@@ -246,7 +246,7 @@ struct BlocklistEditView: View {
                 .foregroundColor(DPWRKStyle.Colors.secondaryText)
             
             Text("No websites \(title.contains("Blocked") ? "blocked" : "allowed")")
-                .font(DPWRKStyle.Typography.sessionBody())
+                .font(DPWRKStyle.Typography.button())
                 .foregroundColor(DPWRKStyle.Colors.secondaryText)
         }
         .padding(.vertical, DPWRKStyle.Layout.spacingLarge)

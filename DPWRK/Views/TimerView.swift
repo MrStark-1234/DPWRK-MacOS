@@ -328,7 +328,7 @@ struct BlocklistButtonStyle: ButtonStyle {
         configuration.label
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .font(DPWRKStyle.Typography.sessionBody())
+            .font(DPWRKStyle.Typography.button())
             .foregroundColor(Color(hex: "4F46E5"))
             .background(DPWRKStyle.Colors.background)
             .cornerRadius(8)

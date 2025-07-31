@@ -59,6 +59,7 @@ struct DurationPickerView: View {
                             }
                         
                         Text("minutes")
+                            .font(DPWRKStyle.Typography.body())
                             .foregroundColor(DPWRKStyle.Colors.secondaryText)
                         
                         Button("Set") {
@@ -97,6 +98,7 @@ struct DurationPickerView: View {
             // Selected duration display with enhanced visual feedback
             HStack {
                 Text("Selected Duration:")
+                    .font(DPWRKStyle.Typography.body())
                     .foregroundColor(DPWRKStyle.Colors.secondaryText)
                 
                 Text(formatDuration(selectedDuration))
@@ -150,11 +152,11 @@ struct DurationPickerView: View {
         }) {
             VStack {
                 Text("\(minutes)")
-                    .font(isSelected ? DPWRKStyle.Typography.bodyLarge() : DPWRKStyle.Typography.body())
+                    .font(DPWRKStyle.Typography.button())
                     .fontWeight(isSelected ? .bold : .regular)
                 
                 Text("min")
-                    .font(DPWRKStyle.Typography.caption())
+                    .font(DPWRKStyle.Typography.button())
                     .foregroundColor(isSelected ? DPWRKStyle.Colors.accent : DPWRKStyle.Colors.secondaryText)
             }
             .frame(minWidth: 80, minHeight: 60)

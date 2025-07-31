@@ -39,12 +39,12 @@ struct AddWebsiteToListView: View {
             // Input section
             VStack(alignment: .leading, spacing: DPWRKStyle.Layout.spacingSmall) {
                 Text("Website URL")
-                    .font(DPWRKStyle.Typography.sessionBody())
+                    .font(DPWRKStyle.Typography.button())
                     .fontWeight(.medium)
                     .foregroundColor(DPWRKStyle.Colors.primaryText)
                 
                 TextField("example.com", text: $websiteURL)
-                    .font(DPWRKStyle.Typography.sessionBody())
+                    .font(DPWRKStyle.Typography.button())
                     .padding()
                     .background(DPWRKStyle.Colors.background)
                     .overlay(
@@ -66,27 +66,27 @@ struct AddWebsiteToListView: View {
                 
                 if let error = validationError {
                     Text(error)
-                        .font(DPWRKStyle.Typography.sessionCaption())
+                        .font(DPWRKStyle.Typography.caption())
                         .foregroundColor(DPWRKStyle.Colors.warning)
                 }
                 
                 // Helper text
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Tips:")
-                        .font(DPWRKStyle.Typography.sessionCaption())
+                        .font(DPWRKStyle.Typography.caption())
                         .fontWeight(.medium)
                         .foregroundColor(DPWRKStyle.Colors.secondaryText)
                     
                     Text("• Enter just the domain (e.g., reddit.com)")
-                        .font(DPWRKStyle.Typography.sessionCaption())
+                        .font(DPWRKStyle.Typography.caption())
                         .foregroundColor(DPWRKStyle.Colors.secondaryText)
                     
                     Text("• No need to include http:// or www.")
-                        .font(DPWRKStyle.Typography.sessionCaption())
+                        .font(DPWRKStyle.Typography.caption())
                         .foregroundColor(DPWRKStyle.Colors.secondaryText)
                     
                     Text("• Use * for wildcards (e.g., *.reddit.com)")
-                        .font(DPWRKStyle.Typography.sessionCaption())
+                        .font(DPWRKStyle.Typography.caption())
                         .foregroundColor(DPWRKStyle.Colors.secondaryText)
                 }
                 .padding(.top, DPWRKStyle.Layout.spacingSmall)

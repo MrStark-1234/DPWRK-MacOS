@@ -25,7 +25,7 @@ struct DurationSelectionView: View {
             HStack {
                 Text("Select Session Duration")
                     .font(DPWRKStyle.Typography.heading1())
-                    .scaleEffect(y: 1.08)
+                   
                 
                 Spacer()
                 
