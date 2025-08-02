@@ -124,9 +124,27 @@ struct TimerView: View {
         .background(DPWRKStyle.Colors.background)
         .navigationTitle("⏱️ Timer")
         .onAppear {
-            // Update the selected duration from user preferences when the view appears
-            selectedDuration = sessionViewModel.userPreferences.defaultDuration
-            timeRemaining = selectedDuration
+            // Only update duration if no timer is currently active
+            if !sessionViewModel.isTimerActive {
+                selectedDuration = sessionViewModel.userPreferences.defaultDuration
+            } else {
+                // Sync with the active timer state
+                isSetupMode = false
+            }
+        }
+        .onReceive(sessionViewModel.$timeRemaining) { newTimeRemaining in
+            timeRemaining = newTimeRemaining
+        }
+        .onReceive(sessionViewModel.$progress) { newProgress in
+            progress = newProgress
+        }
+        .onReceive(sessionViewModel.$isTimerActive) { newIsActive in
+            isTimerActive = newIsActive
+        }
+        .onReceive(sessionViewModel.$isTimerComplete) { isComplete in
+            if isComplete {
+                showTimerCompletion()
+            }
         }
         .onChange(of: selectedDuration) { _, newValue in
             timeRemaining = newValue
@@ -192,11 +210,6 @@ struct TimerView: View {
         let session = sessionViewModel.createSession(goal: goal, duration: selectedDuration)
         sessionViewModel.startSession(session: session)
         
-        // Update local state
-        isTimerActive = true
-        timeRemaining = selectedDuration
-        progress = 1.0
-        
         // Create a small "start" animation
         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
             timerScale = 1.05
@@ -207,33 +220,14 @@ struct TimerView: View {
                 timerScale = 1.0
             }
         }
-        
-        // Set up a timer to update the UI
-        let updateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
-            // Update from view model
-            self.timeRemaining = self.sessionViewModel.timeRemaining
-            self.progress = self.sessionViewModel.progress
-            self.isTimerActive = self.sessionViewModel.isTimerActive
-            
-            // Check if timer completed
-            if self.sessionViewModel.isTimerComplete {
-                self.showTimerCompletion()
-                timer.invalidate()
-            }
-        }
-        
-        // Make sure the timer runs even when scrolling
-        RunLoop.current.add(updateTimer, forMode: .common)
     }
     
     private func toggleTimer() {
-        if isTimerActive {
+        if sessionViewModel.isTimerActive {
             sessionViewModel.pauseTimer()
         } else {
             sessionViewModel.resumeTimer()
         }
-        
-        isTimerActive.toggle()
         
         // Create a small "tap" animation
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
@@ -249,10 +243,7 @@ struct TimerView: View {
     
     private func resetTimer() {
         sessionViewModel.stopTimer()
-        isTimerActive = false
         isSetupMode = true
-        timeRemaining = selectedDuration
-        progress = 1.0
     }
     
     private func showTimerCompletion() {

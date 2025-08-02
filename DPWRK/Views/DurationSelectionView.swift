@@ -47,6 +47,7 @@ struct DurationSelectionView: View {
                 }
             }
             .padding(.bottom, DPWRKStyle.Layout.spacingMedium)
+            .font(DPWRKStyle.Typography.button())
             
             // Custom duration button and input field
             VStack(spacing: DPWRKStyle.Layout.spacingSmall) {

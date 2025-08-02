@@ -49,6 +49,7 @@ struct DurationPickerView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(DPWRKStyle.SecondaryButtonStyle())
+                .font(DPWRKStyle.Typography.body())
                 
                 if showCustomInput {
                     HStack {
@@ -88,7 +89,7 @@ struct DurationPickerView: View {
                     
                     if let error = customInputError {
                         Text(error)
-                            .font(DPWRKStyle.Typography.caption())
+                            .font(DPWRKStyle.Typography.form())
                             .foregroundColor(DPWRKStyle.Colors.warning)
                             .padding(.top, 4)
                     }
@@ -98,7 +99,7 @@ struct DurationPickerView: View {
             // Selected duration display with enhanced visual feedback
             HStack {
                 Text("Selected Duration:")
-                    .font(DPWRKStyle.Typography.body())
+                    .font(DPWRKStyle.Typography.form())
                     .foregroundColor(DPWRKStyle.Colors.secondaryText)
                 
                 Text(formatDuration(selectedDuration))

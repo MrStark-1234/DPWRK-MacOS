@@ -92,6 +92,10 @@ struct DPWRKStyle {
         static func button() -> Font {
             Font.custom(FontFamily.sfPro, size: FontSize.body)
         }
+
+        static func form() -> Font {
+            Font.custom(FontFamily.sfPro, size: FontSize.body)
+        }
     }
     
     // MARK: - Colors

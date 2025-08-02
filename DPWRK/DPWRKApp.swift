@@ -56,5 +56,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Add smooth animations for window resizing
             window.animationBehavior = .documentWindow
         }
+        
+        // Enable background execution for timer functionality
+        NSApplication.shared.setActivationPolicy(.regular)
+    }
+    
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // Keep app running in background when window is closed if timer is active
+        // This allows the timer to continue running
+        return false
+    }
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        // Timer state is automatically saved in SessionViewModel
+        // Notifications are already scheduled
+        // Clean up any background tasks when app terminates
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Allow app to terminate - timer will continue via notifications and persistent state
+        return .terminateNow
     }
 }

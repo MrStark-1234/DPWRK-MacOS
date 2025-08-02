@@ -20,6 +20,8 @@ class SessionViewModel: ObservableObject {
     
     private var timer: Timer?
     private var originalDuration: TimeInterval = 0
+    private var backgroundTaskIdentifier: NSBackgroundActivityScheduler?
+    private var sessionStartTime: Date?
     
     init() {
         // Load user preferences from UserDefaults
@@ -27,6 +29,12 @@ class SessionViewModel: ObservableObject {
         
         // Set up notification observers for system events
         setupNotificationObservers()
+        
+        // Request notification permissions
+        requestNotificationPermissions()
+        
+        // Restore timer state if app was closed during active session
+        restoreTimerState()
     }
     
     deinit {
@@ -52,20 +60,65 @@ class SessionViewModel: ObservableObject {
             name: NSWorkspace.didWakeNotification,
             object: nil
         )
+        
+        // App becoming inactive (background)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppWillResignActive),
+            name: NSApplication.willResignActiveNotification,
+            object: nil
+        )
+        
+        // App becoming active (foreground)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppDidBecomeActive),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
         #endif
     }
     
     #if os(macOS)
     // Handle system sleep
     @objc private func handleSleepNotification() {
-        if isTimerActive {
-            pauseTimer()
-        }
+        // Timer continues running even during sleep
+        // We'll sync the time when the system wakes up
     }
     
     // Handle system wake
     @objc private func handleWakeNotification() {
-        // Don't automatically resume - let the user decide
+        // Sync timer with actual elapsed time
+        syncTimerWithRealTime()
+    }
+    
+    // Handle app going to background
+    @objc private func handleAppWillResignActive() {
+        // Timer continues running in background
+        // No action needed as we use real-time calculation
+    }
+    
+    // Handle app coming to foreground
+    @objc private func handleAppDidBecomeActive() {
+        // Sync timer with actual elapsed time
+        syncTimerWithRealTime()
+    }
+    
+    // Sync timer with real elapsed time
+    private func syncTimerWithRealTime() {
+        guard let startTime = sessionStartTime, isTimerActive else { return }
+        
+        let elapsedTime = Date().timeIntervalSince(startTime)
+        let newTimeRemaining = max(0, originalDuration - elapsedTime)
+        
+        DispatchQueue.main.async {
+            self.timeRemaining = newTimeRemaining
+            self.progress = newTimeRemaining / self.originalDuration
+            
+            if newTimeRemaining <= 0 && !self.isTimerComplete {
+                self.timerCompleted()
+            }
+        }
     }
     #endif
     
@@ -112,27 +165,67 @@ class SessionViewModel: ObservableObject {
         progress = 1.0
         isTimerActive = true
         isTimerComplete = false
+        sessionStartTime = Date()
+        
+        // Save timer state to UserDefaults for persistence
+        saveTimerState()
+        
+        // Schedule completion notification
+        scheduleCompletionNotification()
+        
+        // Set up background activity to keep timer running
+        #if os(macOS)
+        setupBackgroundActivity()
+        #endif
         
         // Create a timer that fires every second
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self, self.isTimerActive else { return }
             
-            if self.timeRemaining > 0 {
-                self.timeRemaining -= 1.0
-                self.progress = self.timeRemaining / self.originalDuration
+            // Use real-time calculation to ensure accuracy
+            if let startTime = self.sessionStartTime {
+                let elapsedTime = Date().timeIntervalSince(startTime)
+                let newTimeRemaining = max(0, self.originalDuration - elapsedTime)
+                
+                self.timeRemaining = newTimeRemaining
+                self.progress = newTimeRemaining / self.originalDuration
+                
+                // Update persistent state
+                self.saveTimerState()
                 
                 // Provide haptic feedback at certain intervals
-                if self.timeRemaining == 60 || self.timeRemaining == 30 || self.timeRemaining == 10 {
+                let remainingMinutes = Int(newTimeRemaining / 60)
+                let remainingSeconds = Int(newTimeRemaining.truncatingRemainder(dividingBy: 60))
+                
+                if (remainingMinutes == 1 && remainingSeconds == 0) || 
+                   (remainingMinutes == 0 && (remainingSeconds == 30 || remainingSeconds == 10)) {
                     self.provideHapticFeedback()
                 }
-            } else {
-                self.timerCompleted()
+                
+                if newTimeRemaining <= 0 {
+                    self.timerCompleted()
+                }
             }
         }
         
-        // Make sure the timer runs even when scrolling
+        // Make sure the timer runs even when scrolling and in background
         RunLoop.current.add(timer!, forMode: .common)
     }
+    
+    #if os(macOS)
+    // Set up background activity to keep timer running
+    private func setupBackgroundActivity() {
+        backgroundTaskIdentifier = NSBackgroundActivityScheduler(identifier: "com.dpwrk.timer")
+        backgroundTaskIdentifier?.repeats = false
+        backgroundTaskIdentifier?.qualityOfService = .userInitiated
+        backgroundTaskIdentifier?.schedule { (completion) in
+            // This keeps the app active in background for timer functionality
+            DispatchQueue.main.asyncAfter(deadline: .now() + self.originalDuration) {
+                completion(.finished)
+            }
+        }
+    }
+    #endif
     
     // Pause the timer
     func pauseTimer() {
@@ -151,6 +244,19 @@ class SessionViewModel: ObservableObject {
         isTimerActive = false
         timeRemaining = originalDuration
         progress = 1.0
+        sessionStartTime = nil
+        
+        // Clear persistent timer state
+        clearTimerState()
+        
+        // Cancel any scheduled notifications
+        cancelCompletionNotification()
+        
+        #if os(macOS)
+        // Cancel background activity
+        backgroundTaskIdentifier?.invalidate()
+        backgroundTaskIdentifier = nil
+        #endif
     }
     
     // Timer completed
@@ -259,5 +365,152 @@ class SessionViewModel: ObservableObject {
             "Set a clear intention for your work..."
         ]
         return placeholders.randomElement() ?? placeholders[0]
+    }
+    
+    // MARK: - Persistent Timer State
+    
+    // Save timer state to UserDefaults
+    private func saveTimerState() {
+        guard let startTime = sessionStartTime else { return }
+        
+        UserDefaults.standard.set(startTime, forKey: "TimerStartTime")
+        UserDefaults.standard.set(originalDuration, forKey: "TimerOriginalDuration")
+        UserDefaults.standard.set(isTimerActive, forKey: "TimerIsActive")
+        UserDefaults.standard.set(currentSession?.goal ?? "", forKey: "TimerSessionGoal")
+    }
+    
+    // Restore timer state from UserDefaults
+    private func restoreTimerState() {
+        guard let startTime = UserDefaults.standard.object(forKey: "TimerStartTime") as? Date,
+              UserDefaults.standard.bool(forKey: "TimerIsActive") else {
+            return
+        }
+        
+        let savedDuration = UserDefaults.standard.double(forKey: "TimerOriginalDuration")
+        let savedGoal = UserDefaults.standard.string(forKey: "TimerSessionGoal") ?? ""
+        
+        // Calculate elapsed time since app was closed
+        let elapsedTime = Date().timeIntervalSince(startTime)
+        let newTimeRemaining = max(0, savedDuration - elapsedTime)
+        
+        if newTimeRemaining > 0 {
+            // Timer is still running, restore state
+            sessionStartTime = startTime
+            originalDuration = savedDuration
+            timeRemaining = newTimeRemaining
+            progress = newTimeRemaining / originalDuration
+            isTimerActive = true
+            isTimerComplete = false
+            
+            // Recreate session
+            currentSession = FocusSession(
+                goal: savedGoal,
+                duration: savedDuration,
+                blockedApps: userPreferences.defaultBlockedApps,
+                blockedWebsites: userPreferences.defaultBlockedWebsites
+            )
+            
+            // Restart the timer
+            startInternalTimer()
+        } else {
+            // Timer has completed while app was closed
+            timerCompleted()
+        }
+    }
+    
+    // Clear persistent timer state
+    private func clearTimerState() {
+        UserDefaults.standard.removeObject(forKey: "TimerStartTime")
+        UserDefaults.standard.removeObject(forKey: "TimerOriginalDuration")
+        UserDefaults.standard.removeObject(forKey: "TimerIsActive")
+        UserDefaults.standard.removeObject(forKey: "TimerSessionGoal")
+    }
+    
+    // Start internal timer without resetting state (for restoration)
+    private func startInternalTimer() {
+        timer?.invalidate()
+        
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.isTimerActive else { return }
+            
+            if let startTime = self.sessionStartTime {
+                let elapsedTime = Date().timeIntervalSince(startTime)
+                let newTimeRemaining = max(0, self.originalDuration - elapsedTime)
+                
+                self.timeRemaining = newTimeRemaining
+                self.progress = newTimeRemaining / self.originalDuration
+                
+                // Update persistent state
+                self.saveTimerState()
+                
+                // Provide haptic feedback at certain intervals
+                let remainingMinutes = Int(newTimeRemaining / 60)
+                let remainingSeconds = Int(newTimeRemaining.truncatingRemainder(dividingBy: 60))
+                
+                if (remainingMinutes == 1 && remainingSeconds == 0) || 
+                   (remainingMinutes == 0 && (remainingSeconds == 30 || remainingSeconds == 10)) {
+                    self.provideHapticFeedback()
+                }
+                
+                if newTimeRemaining <= 0 {
+                    self.timerCompleted()
+                }
+            }
+        }
+        
+        RunLoop.current.add(timer!, forMode: .common)
+    }
+    
+    // MARK: - Notification Handling
+    
+    // Request notification permissions
+    private func requestNotificationPermissions() {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error {
+                print("Notification permission error: \(error)")
+            }
+        }
+    }
+    
+    // Schedule completion notification
+    private func scheduleCompletionNotification() {
+        guard let startTime = sessionStartTime else { return }
+        
+        let center = UNUserNotificationCenter.current()
+        
+        // Cancel any existing notifications
+        center.removeAllPendingNotificationRequests()
+        
+        // Create notification content
+        let content = UNMutableNotificationContent()
+        content.title = "Session Complete! 🎉"
+        content.body = "Great job! Your focus session is complete."
+        content.sound = UNNotificationSound.default
+        
+        // Schedule notification for when timer completes
+        let completionTime = startTime.addingTimeInterval(originalDuration)
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: completionTime),
+            repeats: false
+        )
+        
+        let request = UNNotificationRequest(
+            identifier: "timer-completion",
+            content: content,
+            trigger: trigger
+        )
+        
+        center.add(request) { error in
+            if let error = error {
+                print("Failed to schedule notification: \(error)")
+            }
+        }
+    }
+    
+    // Cancel completion notification
+    private func cancelCompletionNotification() {
+        let center = UNUserNotificationCenter.current()
+        center.removeAllPendingNotificationRequests()
     }
 }
